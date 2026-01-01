@@ -249,6 +249,29 @@
             <div class="example-text">
                 Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
             </div>
+            
+            <!-- Analysis Options -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <div style="font-weight: 600; color: #333; margin-bottom: 12px;">Additional Analysis (requires fetching comment text)</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="enableSentiment" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #666;">Sentiment Analysis</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="enableTopCommenters" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #666;">Top Commenters</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="enableWordCloud" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #666;">Word Cloud</span>
+                    </label>
+                </div>
+                <div style="font-size: 0.85rem; color: #999; margin-top: 8px;">
+                    💡 Tip: Uncheck options to fetch only timestamps and save API quota
+                </div>
+            </div>
+            
             <div class="error" id="errorMsg"></div>
         </div>
 
@@ -294,6 +317,51 @@
 
             <div class="chart-container">
                 <canvas id="activityChart"></canvas>
+            </div>
+
+            <!-- Additional Analysis Sections -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px;">
+                <!-- Sentiment Analysis -->
+                <div id="sentimentSection" style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+                    <h3 style="color: #333; font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Sentiment Analysis</h3>
+                    <div id="sentimentContent">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: #666;">😊 Positive</span>
+                            <span id="sentimentPositive" style="font-weight: 600;">0%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: #666;">😐 Neutral</span>
+                            <span id="sentimentNeutral" style="font-weight: 600;">0%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #666;">😞 Negative</span>
+                            <span id="sentimentNegative" style="font-weight: 600;">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Commenters -->
+                <div id="topCommentersSection" style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+                    <h3 style="color: #333; font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Top Commenters</h3>
+                    <div id="topCommentersContent" style="font-size: 0.9rem; color: #666;">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Word Cloud -->
+            <div id="wordCloudSection" style="background: #f8f9fa; border-radius: 12px; padding: 20px; margin-top: 20px;">
+                <h3 style="color: #333; font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Most Common Words</h3>
+                <div id="wordCloudContent" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    Loading...
+                </div>
+            </div>
+
+            <!-- Export Button -->
+            <div style="margin-top: 20px; text-align: center;">
+                <button id="exportBtn" onclick="exportToCSV()" style="background: #0f0f0f; padding: 12px 24px;">
+                    Export Data to CSV
+                </button>
             </div>
         </div>
     </div>
@@ -354,7 +422,7 @@
             };
         }
 
-        async function fetchAllComments(videoId) {
+        async function fetchAllComments(videoId, fetchFullData = true) {
             let allComments = [];
             let nextPageToken = null;
             let pageCount = 0;
@@ -379,11 +447,20 @@
                     const comment = item.snippet.topLevelComment.snippet;
                     const totalReplyCount = item.snippet.totalReplyCount || 0;
                     
-                    allComments.push({
+                    const commentData = {
                         date: new Date(comment.publishedAt),
                         type: 'comment',
                         isTopLevel: true
-                    });
+                    };
+                    
+                    // Only fetch full data if requested
+                    if (fetchFullData) {
+                        commentData.text = comment.textDisplay;
+                        commentData.author = comment.authorDisplayName;
+                        commentData.likeCount = comment.likeCount || 0;
+                    }
+                    
+                    allComments.push(commentData);
                     
                     // Check if there are replies
                     if (totalReplyCount > 0) {
@@ -392,11 +469,19 @@
                         if (item.replies && item.replies.comments) {
                             // Add the replies we already have
                             item.replies.comments.forEach(reply => {
-                                allComments.push({
+                                const replyData = {
                                     date: new Date(reply.snippet.publishedAt),
                                     type: 'comment',
                                     isTopLevel: false
-                                });
+                                };
+                                
+                                if (fetchFullData) {
+                                    replyData.text = reply.snippet.textDisplay;
+                                    replyData.author = reply.snippet.authorDisplayName;
+                                    replyData.likeCount = reply.snippet.likeCount || 0;
+                                }
+                                
+                                allComments.push(replyData);
                             });
                         }
                         
@@ -404,7 +489,7 @@
                         const repliesReceived = item.replies ? item.replies.comments.length : 0;
                         if (totalReplyCount > repliesReceived) {
                             // Fetch remaining replies for this comment
-                            await fetchRepliesForComment(item.snippet.topLevelComment.id, allComments);
+                            await fetchRepliesForComment(item.snippet.topLevelComment.id, allComments, fetchFullData);
                         }
                     }
                 }
@@ -421,7 +506,7 @@
             return allComments;
         }
 
-        async function fetchRepliesForComment(parentId, allComments) {
+        async function fetchRepliesForComment(parentId, allComments, fetchFullData = true) {
             let nextPageToken = null;
             
             do {
@@ -435,11 +520,19 @@
                 }
                 
                 data.items.forEach(reply => {
-                    allComments.push({
+                    const replyData = {
                         date: new Date(reply.snippet.publishedAt),
                         type: 'comment',
                         isTopLevel: false
-                    });
+                    };
+                    
+                    if (fetchFullData) {
+                        replyData.text = reply.snippet.textDisplay;
+                        replyData.author = reply.snippet.authorDisplayName;
+                        replyData.likeCount = reply.snippet.likeCount || 0;
+                    }
+                    
+                    allComments.push(replyData);
                 });
                 
                 nextPageToken = data.nextPageToken;
@@ -488,6 +581,182 @@
                 daysAgo,
                 publishDate
             };
+        }
+
+        // ===== ADDITIONAL ANALYSIS FUNCTIONS =====
+        
+        function analyzeSentiment(comments) {
+            // Simple sentiment analysis based on keywords
+            const positiveWords = ['love', 'great', 'amazing', 'awesome', 'excellent', 'wonderful', 'fantastic', 'best', 'good', 'nice', 'beautiful', 'perfect', 'thank', 'thanks', '❤️', '😊', '👍', '🔥', '💯'];
+            const negativeWords = ['hate', 'bad', 'terrible', 'awful', 'worst', 'horrible', 'sucks', 'stupid', 'garbage', 'trash', 'useless', 'disappointing', 'disappointed', '👎', '😡', '😞'];
+            
+            let positive = 0, neutral = 0, negative = 0;
+            
+            comments.forEach(comment => {
+                const text = comment.text.toLowerCase();
+                let score = 0;
+                
+                positiveWords.forEach(word => {
+                    if (text.includes(word)) score++;
+                });
+                
+                negativeWords.forEach(word => {
+                    if (text.includes(word)) score--;
+                });
+                
+                if (score > 0) positive++;
+                else if (score < 0) negative++;
+                else neutral++;
+            });
+            
+            const total = comments.length;
+            return {
+                positive: Math.round((positive / total) * 100),
+                neutral: Math.round((neutral / total) * 100),
+                negative: Math.round((negative / total) * 100)
+            };
+        }
+        
+        function getTopCommenters(comments) {
+            const authorCounts = {};
+            
+            comments.forEach(comment => {
+                if (!authorCounts[comment.author]) {
+                    authorCounts[comment.author] = {
+                        count: 0,
+                        totalLikes: 0
+                    };
+                }
+                authorCounts[comment.author].count++;
+                authorCounts[comment.author].totalLikes += comment.likeCount;
+            });
+            
+            // Convert to array and sort by comment count
+            const sorted = Object.entries(authorCounts)
+                .map(([author, data]) => ({
+                    author,
+                    count: data.count,
+                    totalLikes: data.totalLikes
+                }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+            
+            return sorted;
+        }
+        
+        function extractCommonWords(comments) {
+            // Remove HTML tags and get text
+            const stripHtml = (html) => {
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                return div.textContent || div.innerText || '';
+            };
+            
+            // Common words to exclude
+            const stopWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take', 'people', 'into', 'year', 'your', 'some', 'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us', 'is', 'was', 'are', 'been', 'has', 'had', 'were', 'said', 'did', 'having', 'may', 'should', 'am', 'being', 'does', 'did']);
+            
+            const wordCounts = {};
+            
+            comments.forEach(comment => {
+                const text = stripHtml(comment.text).toLowerCase();
+                const words = text.match(/\b[a-z]{3,}\b/g) || [];
+                
+                words.forEach(word => {
+                    if (!stopWords.has(word)) {
+                        wordCounts[word] = (wordCounts[word] || 0) + 1;
+                    }
+                });
+            });
+            
+            // Get top 20 words
+            return Object.entries(wordCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .map(([word, count]) => ({ word, count }));
+        }
+        
+        function displaySentiment(sentiment) {
+            document.getElementById('sentimentPositive').textContent = sentiment.positive + '%';
+            document.getElementById('sentimentNeutral').textContent = sentiment.neutral + '%';
+            document.getElementById('sentimentNegative').textContent = sentiment.negative + '%';
+        }
+        
+        function displayTopCommenters(topCommenters) {
+            const container = document.getElementById('topCommentersContent');
+            
+            if (topCommenters.length === 0) {
+                container.innerHTML = '<p style="color: #999;">No data available</p>';
+                return;
+            }
+            
+            container.innerHTML = topCommenters.map((commenter, index) => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e0e0e0;">
+                    <div>
+                        <span style="color: #999; margin-right: 8px;">${index + 1}.</span>
+                        <span style="color: #333; font-weight: 500;">${commenter.author}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 600; color: #0f0f0f;">${commenter.count} comments</div>
+                        <div style="font-size: 0.8rem; color: #999;">${commenter.totalLikes} likes</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayWordCloud(words) {
+            const container = document.getElementById('wordCloudContent');
+            
+            if (words.length === 0) {
+                container.innerHTML = '<p style="color: #999;">No data available</p>';
+                return;
+            }
+            
+            const maxCount = words[0].count;
+            
+            container.innerHTML = words.map(item => {
+                const size = 0.8 + (item.count / maxCount) * 1.5; // Scale from 0.8 to 2.3em
+                return `
+                    <span style="
+                        font-size: ${size}em;
+                        color: #ff0033;
+                        opacity: ${0.5 + (item.count / maxCount) * 0.5};
+                        font-weight: 600;
+                        padding: 5px 10px;
+                        white-space: nowrap;
+                    " title="${item.count} mentions">${item.word}</span>
+                `;
+            }).join('');
+        }
+
+        let currentVideoData = null; // Store for CSV export
+        
+        function exportToCSV() {
+            if (!currentVideoData) {
+                alert('No data to export');
+                return;
+            }
+            
+            // Create CSV content
+            let csv = 'Date,Top-level Comments,Replies,Total\n';
+            
+            const { labels, commentsData, repliesData } = currentVideoData;
+            
+            labels.forEach((label, index) => {
+                const comments = commentsData[index] || 0;
+                const replies = repliesData[index] || 0;
+                csv += `${label},${comments},${replies},${comments + replies}\n`;
+            });
+            
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `youtube-comments-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
 
         function aggregateData(commentsData, repliesData, labels, daysAgo, publishDate) {
@@ -730,9 +999,15 @@
                     return;
                 }
                 
+                // Check which features are enabled
+                const enableSentiment = document.getElementById('enableSentiment').checked;
+                const enableTopCommenters = document.getElementById('enableTopCommenters').checked;
+                const enableWordCloud = document.getElementById('enableWordCloud').checked;
+                const needsFullData = enableSentiment || enableTopCommenters || enableWordCloud;
+                
                 // Fetch all comments
                 btn.textContent = 'Fetching comments...';
-                const allComments = await fetchAllComments(videoId);
+                const allComments = await fetchAllComments(videoId, needsFullData);
                 
                 if (allComments.length === 0) {
                     showError('No comments found for this video.');
@@ -745,6 +1020,31 @@
                 btn.textContent = 'Processing data...';
                 let { commentsData, repliesData, labels, totalComments, totalReplies, daysAgo, publishDate } = 
                     processCommentsData(allComments, videoDetails.publishDate);
+                
+                // Perform additional analysis only if enabled
+                if (enableSentiment) {
+                    const sentiment = analyzeSentiment(allComments);
+                    displaySentiment(sentiment);
+                    document.getElementById('sentimentSection').style.display = 'block';
+                } else {
+                    document.getElementById('sentimentSection').style.display = 'none';
+                }
+                
+                if (enableTopCommenters) {
+                    const topCommenters = getTopCommenters(allComments);
+                    displayTopCommenters(topCommenters);
+                    document.getElementById('topCommentersSection').style.display = 'block';
+                } else {
+                    document.getElementById('topCommentersSection').style.display = 'none';
+                }
+                
+                if (enableWordCloud) {
+                    const commonWords = extractCommonWords(allComments);
+                    displayWordCloud(commonWords);
+                    document.getElementById('wordCloudSection').style.display = 'block';
+                } else {
+                    document.getElementById('wordCloudSection').style.display = 'none';
+                }
                 
                 // Aggregate data based on video age
                 const aggregated = aggregateData(commentsData, repliesData, labels, daysAgo, publishDate);
@@ -769,6 +1069,9 @@
                 
                 // Create chart
                 createChart(labels, commentsData, repliesData);
+                
+                // Store data for export
+                currentVideoData = { labels, commentsData, repliesData };
                 
                 // Show results
                 document.getElementById('resultsSection').classList.add('visible');
