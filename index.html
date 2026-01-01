@@ -271,7 +271,7 @@
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" id="totalComments">0</div>
-                    <div class="stat-label">Comments</div>
+                    <div class="stat-label">Top-level Comments</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="totalReplies">0</div>
@@ -279,7 +279,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="avgPerDay">0</div>
-                    <div class="stat-label">Avg per Day</div>
+                    <div class="stat-label">Total Comments (Avg/Day)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="peakDay">-</div>
@@ -379,7 +379,8 @@
                     const comment = item.snippet.topLevelComment.snippet;
                     allComments.push({
                         date: new Date(comment.publishedAt),
-                        type: 'comment'
+                        type: 'comment',
+                        isTopLevel: true
                     });
                     
                     // Add replies if they exist
@@ -387,7 +388,8 @@
                         item.replies.comments.forEach(reply => {
                             allComments.push({
                                 date: new Date(reply.snippet.publishedAt),
-                                type: 'reply'
+                                type: 'comment', // Changed from 'reply' - they're all comments in YouTube's terminology
+                                isTopLevel: false
                             });
                         });
                     }
@@ -418,7 +420,7 @@
             comments.forEach(item => {
                 const dayIndex = Math.floor((item.date - publishDate) / (1000 * 60 * 60 * 24));
                 if (dayIndex >= 0 && dayIndex <= daysAgo) {
-                    if (item.type === 'comment') {
+                    if (item.isTopLevel) {
                         commentsByDay[dayIndex]++;
                     } else {
                         repliesByDay[dayIndex]++;
@@ -553,7 +555,7 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Comments',
+                            label: 'Top-level Comments',
                             data: commentsData,
                             borderColor: '#ff0033',
                             backgroundColor: 'rgba(255, 0, 51, 0.1)',
