@@ -230,16 +230,24 @@
 
         /* Toggle Switch Styles */
         .toggle-container {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 12px 0;
+            margin-right: 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
         }
 
         .toggle-label {
             color: #0f0f0f;
             font-weight: 500;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
+            margin-right: 8px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .toggle-container:hover .toggle-label {
+            color: #ff0033;
         }
 
         .switch {
@@ -291,6 +299,13 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        .toggle-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -310,38 +325,37 @@
                 >
                 <button id="analyzeBtn" onclick="analyzeVideo()">Analyze</button>
             </div>
-            <div class="example-text">
-                Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
-            </div>
             
             <!-- Analysis Options with Toggle Switches -->
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-                <div class="toggle-container">
-                    <span class="toggle-label">Sentiment Analysis</span>
-                    <label class="switch">
-                        <input type="checkbox" id="enableSentiment" checked>
-                        <span class="slider"></span>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                <div class="toggle-wrapper">
+                    <label class="toggle-container" for="enableSentiment">
+                        <span class="toggle-label">Sentiment Analysis</span>
+                        <div class="switch">
+                            <input type="checkbox" id="enableSentiment" checked>
+                            <span class="slider"></span>
+                        </div>
                     </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Top Commenters</span>
-                    <label class="switch">
-                        <input type="checkbox" id="enableTopCommenters" checked>
-                        <span class="slider"></span>
+                    <label class="toggle-container" for="enableTopCommenters">
+                        <span class="toggle-label">Top Commenters</span>
+                        <div class="switch">
+                            <input type="checkbox" id="enableTopCommenters" checked>
+                            <span class="slider"></span>
+                        </div>
                     </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Top Comments</span>
-                    <label class="switch">
-                        <input type="checkbox" id="enableTopComments" checked>
-                        <span class="slider"></span>
+                    <label class="toggle-container" for="enableTopComments">
+                        <span class="toggle-label">Top Comments</span>
+                        <div class="switch">
+                            <input type="checkbox" id="enableTopComments" checked>
+                            <span class="slider"></span>
+                        </div>
                     </label>
-                </div>
-                <div class="toggle-container">
-                    <span class="toggle-label">Word Cloud</span>
-                    <label class="switch">
-                        <input type="checkbox" id="enableWordCloud" checked>
-                        <span class="slider"></span>
+                    <label class="toggle-container" for="enableWordCloud">
+                        <span class="toggle-label">Word Cloud</span>
+                        <div class="switch">
+                            <input type="checkbox" id="enableWordCloud" checked>
+                            <span class="slider"></span>
+                        </div>
                     </label>
                 </div>
             </div>
