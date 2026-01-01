@@ -375,25 +375,39 @@
                 }
                 
                 // Process comments and replies
-                data.items.forEach(item => {
+                for (const item of data.items) {
                     const comment = item.snippet.topLevelComment.snippet;
+                    const totalReplyCount = item.snippet.totalReplyCount || 0;
+                    
                     allComments.push({
                         date: new Date(comment.publishedAt),
                         type: 'comment',
                         isTopLevel: true
                     });
                     
-                    // Add replies if they exist
-                    if (item.replies) {
-                        item.replies.comments.forEach(reply => {
-                            allComments.push({
-                                date: new Date(reply.snippet.publishedAt),
-                                type: 'comment', // Changed from 'reply' - they're all comments in YouTube's terminology
-                                isTopLevel: false
+                    // Check if there are replies
+                    if (totalReplyCount > 0) {
+                        // The API only includes first 5 replies in the thread response
+                        // If there are more than 5, we need to fetch them separately
+                        if (item.replies && item.replies.comments) {
+                            // Add the replies we already have
+                            item.replies.comments.forEach(reply => {
+                                allComments.push({
+                                    date: new Date(reply.snippet.publishedAt),
+                                    type: 'comment',
+                                    isTopLevel: false
+                                });
                             });
-                        });
+                        }
+                        
+                        // If totalReplyCount > number of replies we got, fetch the rest
+                        const repliesReceived = item.replies ? item.replies.comments.length : 0;
+                        if (totalReplyCount > repliesReceived) {
+                            // Fetch remaining replies for this comment
+                            await fetchRepliesForComment(item.snippet.topLevelComment.id, allComments);
+                        }
                     }
-                });
+                }
                 
                 nextPageToken = data.nextPageToken;
                 pageCount++;
@@ -405,6 +419,36 @@
             } while (nextPageToken && pageCount < maxPages);
             
             return allComments;
+        }
+
+        async function fetchRepliesForComment(parentId, allComments) {
+            let nextPageToken = null;
+            
+            do {
+                const url = `${API_BASE_URL}/comments?part=snippet&parentId=${parentId}&maxResults=100${nextPageToken ? '&pageToken=' + nextPageToken : ''}&key=${API_KEY}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error || !data.items) {
+                    break;
+                }
+                
+                data.items.forEach(reply => {
+                    allComments.push({
+                        date: new Date(reply.snippet.publishedAt),
+                        type: 'comment',
+                        isTopLevel: false
+                    });
+                });
+                
+                nextPageToken = data.nextPageToken;
+                
+                // Update progress
+                const btn = document.getElementById('analyzeBtn');
+                btn.textContent = `Loading... (${allComments.length} items)`;
+                
+            } while (nextPageToken);
         }
 
         function processCommentsData(comments, publishDate) {
