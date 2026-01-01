@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Comment Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #eaeaea;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: #0f0f0f;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.7;
+        }
+
+        .input-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 16px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #ff0033;
+            box-shadow: 0 0 0 3px rgba(255, 0, 51, 0.1);
+        }
+
+        button {
+            padding: 16px 32px;
+            background: #ff0033;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 0, 51, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .example-text {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .results-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .results-section.visible {
+            display: block;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0f0f0f;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #ff0033;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ff0033;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error.visible {
+            display: block;
+        }
+
+        .video-preview {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .video-thumbnail {
+            flex-shrink: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .video-thumbnail img {
+            display: block;
+            width: 240px;
+            height: 135px;
+            object-fit: cover;
+        }
+
+        .video-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .video-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .video-meta {
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>YouTube Comment Analyzer</h1>
+            <p>Analyze comment activity patterns from any YouTube video</p>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="videoUrl" 
+                    placeholder="Paste YouTube video URL here..."
+                    aria-label="YouTube video URL"
+                >
+                <button id="analyzeBtn" onclick="analyzeVideo()">Analyze</button>
+            </div>
+            <div class="example-text">
+                Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+            </div>
+            <div class="error" id="errorMsg"></div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h2 style="margin-bottom: 20px; color: #333;">Comment Activity Analysis</h2>
+            
+            <div class="video-preview" id="videoPreview">
+                <div class="video-thumbnail">
+                    <img id="videoThumbnail" src="" alt="Video thumbnail">
+                </div>
+                <div class="video-info">
+                    <div class="video-title" id="videoTitle">Video Title</div>
+                    <div class="video-meta">
+                        <span id="videoChannel">Channel Name</span> • 
+                        <span id="videoDate">Published date</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalComments">0</div>
+                    <div class="stat-label">Comments</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalReplies">0</div>
+                    <div class="stat-label">Replies</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgPerDay">0</div>
+                    <div class="stat-label">Avg per Day</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="peakDay">-</div>
+                    <div class="stat-label">Peak Activity Day</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="color: #333; font-size: 1.1rem; font-weight: 600;">Activity Over Time</h3>
+                <span id="aggregationLabel" style="font-size: 0.85rem; color: #666; font-weight: 500;"></span>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        // Get your API key from: https://console.cloud.google.com/apis/credentials
+        const API_KEY = 'YOUR_YOUTUBE_API_KEY_HERE';
+        const API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+        
+        let activityChart = null;
+
+        function extractVideoId(url) {
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                /^([a-zA-Z0-9_-]{11})$/
+            ];
+            
+            for (let pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) return match[1];
+            }
+            return null;
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.textContent = message;
+            errorEl.classList.add('visible');
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').classList.remove('visible');
+        }
+
+        // ===== YOUTUBE API FUNCTIONS =====
+        async function fetchVideoDetails(videoId) {
+            const url = `${API_BASE_URL}/videos?part=snippet,statistics&id=${videoId}&key=${API_KEY}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+            
+            if (!data.items || data.items.length === 0) {
+                throw new Error('Video not found');
+            }
+            
+            const video = data.items[0];
+            return {
+                title: video.snippet.title,
+                channel: video.snippet.channelTitle,
+                publishDate: new Date(video.snippet.publishedAt),
+                thumbnail: video.snippet.thumbnails.medium.url,
+                commentCount: parseInt(video.statistics.commentCount || 0)
+            };
+        }
+
+        async function fetchAllComments(videoId) {
+            let allComments = [];
+            let nextPageToken = null;
+            let pageCount = 0;
+            const maxPages = 50; // Limit to prevent excessive API calls
+            
+            do {
+                const url = `${API_BASE_URL}/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&order=time${nextPageToken ? '&pageToken=' + nextPageToken : ''}&key=${API_KEY}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                if (!data.items) {
+                    break;
+                }
+                
+                // Process comments and replies
+                data.items.forEach(item => {
+                    const comment = item.snippet.topLevelComment.snippet;
+                    allComments.push({
+                        date: new Date(comment.publishedAt),
+                        type: 'comment'
+                    });
+                    
+                    // Add replies if they exist
+                    if (item.replies) {
+                        item.replies.comments.forEach(reply => {
+                            allComments.push({
+                                date: new Date(reply.snippet.publishedAt),
+                                type: 'reply'
+                            });
+                        });
+                    }
+                });
+                
+                nextPageToken = data.nextPageToken;
+                pageCount++;
+                
+                // Update progress
+                const btn = document.getElementById('analyzeBtn');
+                btn.textContent = `Loading... (${allComments.length} items)`;
+                
+            } while (nextPageToken && pageCount < maxPages);
+            
+            return allComments;
+        }
+
+        function processCommentsData(comments, publishDate) {
+            const now = new Date();
+            const daysAgo = Math.floor((now - publishDate) / (1000 * 60 * 60 * 24));
+            
+            // Create arrays for each day
+            const commentsByDay = new Array(daysAgo + 1).fill(0);
+            const repliesByDay = new Array(daysAgo + 1).fill(0);
+            const labels = [];
+            
+            // Count comments and replies by day
+            comments.forEach(item => {
+                const dayIndex = Math.floor((item.date - publishDate) / (1000 * 60 * 60 * 24));
+                if (dayIndex >= 0 && dayIndex <= daysAgo) {
+                    if (item.type === 'comment') {
+                        commentsByDay[dayIndex]++;
+                    } else {
+                        repliesByDay[dayIndex]++;
+                    }
+                }
+            });
+            
+            // Create labels
+            for (let i = 0; i <= daysAgo; i++) {
+                const date = new Date(publishDate);
+                date.setDate(date.getDate() + i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+            
+            return {
+                commentsData: commentsByDay,
+                repliesData: repliesByDay,
+                labels,
+                totalComments: commentsByDay.reduce((a, b) => a + b, 0),
+                totalReplies: repliesByDay.reduce((a, b) => a + b, 0),
+                daysAgo,
+                publishDate
+            };
+        }
+
+        function aggregateData(commentsData, repliesData, labels, daysAgo, publishDate) {
+            // Determine aggregation level based on video age
+            let aggregationLevel;
+            let levelText;
+            
+            if (daysAgo <= 90) {
+                // Less than 3 months: show daily
+                return { 
+                    commentsData, 
+                    repliesData, 
+                    labels,
+                    levelText: 'Daily data'
+                };
+            } else if (daysAgo <= 365) {
+                aggregationLevel = 'week';
+                levelText = 'Weekly aggregation';
+            } else {
+                aggregationLevel = 'month';
+                levelText = 'Monthly aggregation';
+            }
+            
+            // Create date objects for each data point
+            const dates = [];
+            for (let i = 0; i <= daysAgo; i++) {
+                const date = new Date(publishDate);
+                date.setDate(date.getDate() + i);
+                dates.push(date);
+            }
+            
+            // Group data by calendar periods
+            const groups = new Map();
+            
+            dates.forEach((date, index) => {
+                let key;
+                
+                if (aggregationLevel === 'week') {
+                    // Get the Monday of this week (or Sunday if you prefer)
+                    const weekStart = new Date(date);
+                    const day = weekStart.getDay();
+                    const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+                    weekStart.setDate(diff);
+                    weekStart.setHours(0, 0, 0, 0);
+                    key = weekStart.toISOString().split('T')[0];
+                } else if (aggregationLevel === 'month') {
+                    // Get the first day of this month
+                    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+                    key = monthStart.toISOString().split('T')[0];
+                }
+                
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        comments: 0,
+                        replies: 0,
+                        date: aggregationLevel === 'week' 
+                            ? new Date(key) 
+                            : new Date(date.getFullYear(), date.getMonth(), 1)
+                    });
+                }
+                
+                groups.get(key).comments += commentsData[index];
+                groups.get(key).replies += repliesData[index];
+            });
+            
+            // Convert map to arrays, sorted by date
+            const sortedGroups = Array.from(groups.entries())
+                .sort((a, b) => new Date(a[0]) - new Date(b[0]));
+            
+            const aggregatedComments = [];
+            const aggregatedReplies = [];
+            const aggregatedLabels = [];
+            
+            sortedGroups.forEach(([key, data]) => {
+                aggregatedComments.push(data.comments);
+                aggregatedReplies.push(data.replies);
+                
+                if (aggregationLevel === 'week') {
+                    aggregatedLabels.push(data.date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                    }));
+                } else {
+                    aggregatedLabels.push(data.date.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short' 
+                    }));
+                }
+            });
+            
+            return {
+                commentsData: aggregatedComments,
+                repliesData: aggregatedReplies,
+                labels: aggregatedLabels,
+                levelText
+            };
+        }
+
+        function createChart(labels, commentsData, repliesData) {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            
+            if (activityChart) {
+                activityChart.destroy();
+            }
+            
+            activityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Comments',
+                            data: commentsData,
+                            borderColor: '#ff0033',
+                            backgroundColor: 'rgba(255, 0, 51, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Replies',
+                            data: repliesData,
+                            borderColor: '#ff006e',
+                            backgroundColor: 'rgba(255, 0, 110, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 15
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        async function analyzeVideo() {
+            const urlInput = document.getElementById('videoUrl');
+            const url = urlInput.value.trim();
+            
+            hideError();
+            
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+            
+            const videoId = extractVideoId(url);
+            if (!videoId) {
+                showError('Invalid YouTube URL. Please check and try again.');
+                return;
+            }
+            
+            // Check if API key is configured
+            if (API_KEY === 'YOUR_YOUTUBE_API_KEY_HERE') {
+                showError('Please configure your YouTube API key in the code. Get one at: https://console.cloud.google.com/apis/credentials');
+                return;
+            }
+            
+            // Disable button and show loading state
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Loading video details...';
+            
+            try {
+                // Fetch video details
+                const videoDetails = await fetchVideoDetails(videoId);
+                
+                // Update video preview
+                document.getElementById('videoThumbnail').src = videoDetails.thumbnail;
+                document.getElementById('videoTitle').textContent = videoDetails.title;
+                document.getElementById('videoChannel').textContent = videoDetails.channel;
+                document.getElementById('videoDate').textContent = videoDetails.publishDate.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                
+                // Check if comments are disabled
+                if (videoDetails.commentCount === 0) {
+                    showError('This video has no comments or comments are disabled.');
+                    btn.disabled = false;
+                    btn.textContent = 'Analyze';
+                    return;
+                }
+                
+                // Fetch all comments
+                btn.textContent = 'Fetching comments...';
+                const allComments = await fetchAllComments(videoId);
+                
+                if (allComments.length === 0) {
+                    showError('No comments found for this video.');
+                    btn.disabled = false;
+                    btn.textContent = 'Analyze';
+                    return;
+                }
+                
+                // Process the comments data
+                btn.textContent = 'Processing data...';
+                let { commentsData, repliesData, labels, totalComments, totalReplies, daysAgo, publishDate } = 
+                    processCommentsData(allComments, videoDetails.publishDate);
+                
+                // Aggregate data based on video age
+                const aggregated = aggregateData(commentsData, repliesData, labels, daysAgo, publishDate);
+                commentsData = aggregated.commentsData;
+                repliesData = aggregated.repliesData;
+                labels = aggregated.labels;
+                
+                // Display aggregation level
+                document.getElementById('aggregationLabel').textContent = aggregated.levelText;
+                
+                // Find peak day (based on total activity)
+                const totalActivity = commentsData.map((c, i) => c + repliesData[i]);
+                const maxActivity = Math.max(...totalActivity);
+                const peakIndex = totalActivity.indexOf(maxActivity);
+                const peakDay = labels[peakIndex];
+                
+                // Update stats
+                document.getElementById('totalComments').textContent = totalComments.toLocaleString();
+                document.getElementById('totalReplies').textContent = totalReplies.toLocaleString();
+                document.getElementById('avgPerDay').textContent = Math.round((totalComments + totalReplies) / daysAgo);
+                document.getElementById('peakDay').textContent = peakDay;
+                
+                // Create chart
+                createChart(labels, commentsData, repliesData);
+                
+                // Show results
+                document.getElementById('resultsSection').classList.add('visible');
+                
+                // Re-enable button
+                btn.disabled = false;
+                btn.textContent = 'Analyze';
+                
+                // Smooth scroll to results
+                document.getElementById('resultsSection').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Analyze';
+            }
+        }
+
+        // Allow Enter key to trigger analysis
+        document.getElementById('videoUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                analyzeVideo();
+            }
+        });
+    </script>
+</body>
+</html>
