@@ -522,7 +522,7 @@
             let allComments = [];
             let nextPageToken = null;
             let pageCount = 0;
-            const maxPages = 50; // Limit to prevent excessive API calls
+            const maxPages = 500; // Limit to prevent excessive API calls
             
             do {
                 const url = `${API_BASE_URL}/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&order=time${nextPageToken ? '&pageToken=' + nextPageToken : ''}&key=${API_KEY}`;
